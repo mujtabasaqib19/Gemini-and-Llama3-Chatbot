@@ -1,0 +1,355 @@
+codes
+
+Step 1: Create the Header and Implementation Files
+1. LetterCount.h
+c
+Copy code
+#ifndef LETTERCOUNT_H
+#define LETTERCOUNT_H
+
+int countLetters(const char* filename);
+
+#endif
+LetterCount.c
+c
+Copy code
+#include "LetterCount.h"
+#include <stdio.h>
+#include <ctype.h>
+
+int countLetters(const char* filename) {
+    FILE* file = fopen(filename, "r");
+    if (file == NULL) {
+        printf("Error opening file.\n");
+        return -1;
+    }
+
+    int count = 0;
+    char ch;
+    while ((ch = fgetc(file)) != EOF) {
+        if (isalpha(ch)) {
+            count++;
+        }
+    }
+
+    fclose(file);
+    return count;
+}
+2. WordCount.h
+c
+Copy code
+#ifndef WORDCOUNT_H
+#define WORDCOUNT_H
+
+int countWords(const char* filename);
+
+#endif
+WordCount.c
+c
+Copy code
+#include "WordCount.h"
+#include <stdio.h>
+#include <ctype.h>
+
+int countWords(const char* filename) {
+    FILE* file = fopen(filename, "r");
+    if (file == NULL) {
+        printf("Error opening file.\n");
+        return -1;
+    }
+
+    int count = 0;
+    char ch;
+    int inWord = 0;
+
+    while ((ch = fgetc(file)) != EOF) {
+        if (isspace(ch)) {
+            inWord = 0;
+        } else if (inWord == 0) {
+            inWord = 1;
+            count++;
+        }
+    }
+
+    fclose(file);
+    return count;
+}
+3. LineCount.h
+c
+Copy code
+#ifndef LINECOUNT_H
+#define LINECOUNT_H
+
+int countLines(const char* filename);
+
+#endif
+LineCount.c
+c
+Copy code
+#include "LineCount.h"
+#include <stdio.h>
+
+int countLines(const char* filename) {
+    FILE* file = fopen(filename, "r");
+    if (file == NULL) {
+        printf("Error opening file.\n");
+        return -1;
+    }
+
+    int count = 0;
+    char ch;
+
+    while ((ch = fgetc(file)) != EOF) {
+        if (ch == '\n') {
+            count++;
+        }
+    }
+
+    fclose(file);
+    return count;
+}
+Step 2: Create the main.c File
+main.c
+c
+Copy code
+#include <stdio.h>
+#include "LetterCount.h"
+#include "WordCount.h"
+#include "LineCount.h"
+
+int main() {
+    const char* filename = "test.txt";
+
+    int letters = countLetters(filename);
+    int words = countWords(filename);
+    int lines = countLines(filename);
+
+    printf("Letters: %d\n", letters);
+    printf("Words: %d\n", words);
+    printf("Lines: %d\n", lines);
+
+    return 0;
+}
+
+
+1. file1.c (Parent-Child Communication)
+c
+Copy code
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <string.h>
+
+int main() {
+    int pipe1[2], pipe2[2];  // Two pipes: one for sending, one for receiving
+    pid_t pid;
+
+    // Create the pipes
+    if (pipe(pipe1) == -1 || pipe(pipe2) == -1) {
+        perror("Pipe creation failed");
+        return 1;
+    }
+
+    // Fork to create the child process
+    pid = fork();
+
+    if (pid == 0) {  // Child Process
+        close(pipe1[0]);  // Close read end of pipe1
+        char morse[] = ". ___ .... __";
+        printf("File 1 Child: Sending Morse Code -> %s\n", morse);
+        write(pipe1[1], morse, strlen(morse) + 1);  // Send Morse code
+        close(pipe1[1]);  // Close write end of pipe1
+
+        exit(0);
+    } else {  // Parent Process
+        wait(NULL);  // Wait for child to complete
+
+        close(pipe2[1]);  // Close write end of pipe2
+        char finalMessage[100];
+        read(pipe2[0], finalMessage, sizeof(finalMessage));  // Read final message
+        close(pipe2[0]);  // Close read end of pipe2
+
+        printf("File 1 Parent: Message Received -> %s\n", finalMessage);
+    }
+
+    return 0;
+}
+2. file2.c (Translation to "Hello World")
+c
+Copy code
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <string.h>
+
+int main() {
+    int pipe1[2];  // Pipe to receive Morse code
+    int pipe2[2];  // Pipe to send translated message
+
+    // Create pipes
+    if (pipe(pipe1) == -1 || pipe(pipe2) == -1) {
+        perror("Pipe creation failed");
+        return 1;
+    }
+
+    pid_t pid = fork();
+
+    if (pid == 0) {  // Child Process (Member 3)
+        close(pipe1[1]);  // Close write end of pipe1
+        char morse[50];
+        read(pipe1[0], morse, sizeof(morse));  // Read Morse code
+        close(pipe1[0]);  // Close read end of pipe1
+
+        printf("File 2 Parent: Received Morse Code -> %s\n", morse);
+
+        // Translate to "Hello World"
+        char message[] = "Hello World";
+        printf("File 2 Parent: Sending -> %s\n", message);
+
+        close(pipe2[0]);  // Close read end of pipe2
+        write(pipe2[1], message, strlen(message) + 1);  // Send message
+        close(pipe2[1]);  // Close write end of pipe2
+
+        exit(0);
+    }
+
+    return 0;
+}
+3. file3.c (Appending "Hello Linux World")
+c
+Copy code
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <string.h>
+
+int main() {
+    int pipe2[2], pipe3[2];  // Pipes for communication
+
+    // Create pipes
+    if (pipe(pipe2) == -1 || pipe(pipe3) == -1) {
+        perror("Pipe creation failed");
+        return 1;
+    }
+
+    pid_t pid = fork();
+
+    if (pid == 0) {  // Child Process (Member 4)
+        close(pipe2[1]);  // Close write end of pipe2
+        char message[100];
+        read(pipe2[0], message, sizeof(message));  // Receive "Hello World"
+        close(pipe2[0]);  // Close read end of pipe2
+
+        printf("File 3 Parent: Received -> %s\n", message);
+
+        // Append "Hello Linux World"
+        strcat(message, " Hello Linux World");
+        printf("File 3 Parent: Sending -> %s\n", message);
+
+        close(pipe3[0]);  // Close read end of pipe3
+        write(pipe3[1], message, strlen(message) + 1);  // Send final message
+        close(pipe3[1]);  // Close write end of pipe3
+
+        exit(0);
+    }
+
+    return 0;
+}
+Makefile (Optional, for Compilation)
+makefile
+Copy code
+all: file1 file2 file3
+
+file1: file1.c
+    gcc file1.c -o file1
+
+file2: file2.c
+    gcc file2.c -o file2
+
+file3: file3.c
+    gcc file3.c -o file3
+
+clean:
+    rm -f file1 file2 file3
+How to Compile and Run:
+Compile the programs using:
+
+bash
+Copy code
+make
+Run the first file to start the communication:
+
+bash
+Copy code
+./file1
+
+
+Corrected file1.sh
+bash
+Copy code
+#!/bin/bash
+
+# Create a C file named sort.c using a here document
+cat <<EOF > sort.c
+#include <stdio.h>
+
+void bubbleSort(int arr[], int n) {
+    for (int i = 0; i < n - 1; i++) {
+        for (int j = 0; j < n - i - 1; j++) {
+            if (arr[j] > arr[j + 1]) {
+                int temp = arr[j];
+                arr[j] = arr[j + 1];
+                arr[j + 1] = temp;
+            }
+        }
+    }
+}
+
+int main(int argc, char *argv[]) {
+    int arr[5] = {5, 3, 8, 6, 2};
+    int n = 5;
+
+    bubbleSort(arr, n);
+
+    printf("Sorted array: ");
+    for (int i = 0; i < n; i++) {
+        printf("%d ", arr[i]);
+    }
+    printf("\n");
+
+    return 0;
+}
+EOF
+
+# Execute the next script
+bash file2.sh
+
+2. file2.sh (Compile the C Program)
+Create a file named file2.sh:
+
+bash
+Copy code
+#!/bin/bash
+
+echo "Compiling the C program."
+
+# Compile the C program into two files: out.o and output
+gcc -c sort_array.c -o out.o
+gcc sort_array.c -o output
+
+echo "Compilation complete. Moving to file3.sh."
+./file3.sh  # Start file3.sh after compiling the program
+3. file3.sh (Run the Program with Parameters)
+Create a file named file3.sh:
+
+bash
+Copy code
+#!/bin/bash
+
+echo "Running the compiled program with input parameters."
+
+# Run the compiled program with command-line arguments
+./output 12 4 56 7 89 3
+
+echo "Execution complete. Now calling file2.sh for file management."
+./file2.sh  # Re-run file2.sh for file management tasks

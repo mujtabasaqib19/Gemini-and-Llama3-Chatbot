@@ -1,0 +1,82 @@
+Terminal Related Commands:
+man [command_name]
+clear
+exit
+history [option]
+echo [option] [string]
+alias Name=String
+unalias [alias_name]
+| (pipe)
+&& (logical AND)
+
+System Related Commands:
+date
+shutdown now
+shutdown -r now
+sudo poweroff
+sudo reboot
+ps
+kill [signal_option] pid
+df [options] [file]
+du /home/user/Documents
+top
+htop [options]
+uname [option]
+
+Managing Users & Groups Commands:
+sudo [command]
+sudo -k (reset timestamp)
+sudo -group=group
+sudo -host=host
+Network Related Commands:
+ping [option] [hostname_or_IP_address]
+wget [option] [url]
+hostname [option]
+hostname -i
+ip [OPTION] OBJECT {COMMAND | help}
+
+Managing Files & Directories:
+pwd [option]
+cd [path]
+ls [options] [path]
+mkdir [option] directory_name
+rmdir -p [directory]
+cp [options] source destination
+mv old_filename.txt new_filename.txt
+rm [options] filename
+
+File Creation & Editing Commands:
+touch /home/username/Documents/Web.html
+cat [options] [file(s)]
+nano [filename]
+vi [filename]
+jed
+
+Search Commands:
+locate -i school*not
+find [option] [path] [expression]
+grep blue notepad.txt
+Output Display Commands:
+head [option] [file]
+tail [option] [file]
+File Permissions & Ownership Commands:
+chmod [option] [permission] [file_name]
+chown [option] owner[:group] file(s)
+
+Wildcards in Linux:
+ls file*
+ls *2.txt
+ls file.tx?
+ls rmt[12345]
+C Program Compilation Commands:
+nano test.c
+gcc test.c
+./a.out
+gcc test.c -o output_file
+
+Lab Activity Commands:
+mkdir -p dirOSLAB/subDir/subsubdir/OSLAB2
+rm -r [folder]
+rmdir -p [folder]
+find ./ -type d -name [directoryname]
+grep -i "file" *.txt

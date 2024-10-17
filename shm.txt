@@ -1,0 +1,897 @@
+Process 1: Writer (Creates and Writes to Shared Memory)
+c
+Copy code
+// writer.c
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/ipc.h>
+#include <sys/shm.h>
+
+#define SHM_SIZE 1024  // Size of shared memory
+
+int main() {
+    key_t key = ftok("shmfile", 65);  // Generate a unique key
+    int shmid = shmget(key, SHM_SIZE, 0666 | IPC_CREAT);  // Create shared memory
+
+    if (shmid < 0) {
+        perror("shmget failed");
+        exit(1);
+    }
+
+    char *str = (char *)shmat(shmid, NULL, 0);  // Attach shared memory to process
+
+    printf("Write Data: ");
+    fgets(str, SHM_SIZE, stdin);  // Take input from user
+
+    printf("Data written in memory: %s\n", str);
+
+    shmdt(str);  // Detach from shared memory
+    return 0;
+}
+
+Process 2: Reader (Reads from Shared Memory)
+c
+Copy code
+// reader.c
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/ipc.h>
+#include <sys/shm.h>
+
+#define SHM_SIZE 1024  // Size of shared memory
+
+int main() {
+    key_t key = ftok("shmfile", 65);  // Generate the same unique key
+    int shmid = shmget(key, SHM_SIZE, 0666);  // Access the shared memory
+
+    if (shmid < 0) {
+        perror("shmget failed");
+        exit(1);
+    }
+
+    char *str = (char *)shmat(shmid, NULL, 0);  // Attach shared memory to process
+
+    printf("Data read from memory: %s\n", str);
+
+    shmdt(str);  // Detach from shared memory
+    shmctl(shmid, IPC_RMID, NULL);  // Destroy the shared memory
+    return 0;
+}
+
+gcc writer.c -o writer
+gcc reader.c -o reader
+
+Code: Prime Number using Shared Memory
+Process 1: Writer (Generates Prime Numbers and Stores Them in Shared Memory)
+c
+Copy code
+// prime_writer.c
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/ipc.h>
+#include <sys/shm.h>
+#include <unistd.h>
+
+#define SHM_SIZE 1024  // Size of shared memory
+
+// Function to check if a number is prime
+int isPrime(int n) {
+    if (n <= 1) return 0;
+    for (int i = 2; i * i <= n; i++) {
+        if (n % i == 0) return 0;
+    }
+    return 1;
+}
+
+int main() {
+    key_t key = ftok("shmfile", 65);  // Generate unique key
+    int shmid = shmget(key, SHM_SIZE, 0666 | IPC_CREAT);  // Create shared memory
+
+    if (shmid < 0) {
+        perror("shmget failed");
+        exit(1);
+    }
+
+    int *data = (int *)shmat(shmid, NULL, 0);  // Attach shared memory to process
+    if (data == (int *)-1) {
+        perror("shmat failed");
+        exit(1);
+    }
+
+    int index = 0;
+    printf("Generating prime numbers...\n");
+    for (int i = 2; i <= 100; i++) {  // Find primes between 2 and 100
+        if (isPrime(i)) {
+            data[index++] = i;  // Store prime in shared memory
+        }
+    }
+    data[index] = -1;  // End of data marker
+
+    printf("Prime numbers written to shared memory.\n");
+
+    shmdt(data);  // Detach from shared memory
+    return 0;
+}
+Process 2: Reader (Reads Prime Numbers from Shared Memory)
+c
+Copy code
+// prime_reader.c
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/ipc.h>
+#include <sys/shm.h>
+
+#define SHM_SIZE 1024  // Size of shared memory
+
+int main() {
+    key_t key = ftok("shmfile", 65);  // Generate the same unique key
+    int shmid = shmget(key, SHM_SIZE, 0666);  // Access shared memory
+
+    if (shmid < 0) {
+        perror("shmget failed");
+        exit(1);
+    }
+
+    int *data = (int *)shmat(shmid, NULL, 0);  // Attach shared memory to process
+    if (data == (int *)-1) {
+        perror("shmat failed");
+        exit(1);
+    }
+
+    printf("Reading prime numbers from shared memory:\n");
+    for (int i = 0; data[i] != -1; i++) {  // Read primes until -1 marker
+        printf("%d ", data[i]);
+    }
+    printf("\n");
+
+    shmdt(data);  // Detach from shared memory
+    shmctl(shmid, IPC_RMID, NULL);  // Destroy shared memory
+
+    return 0;
+}
+
+Code: Check if a Number is Prime using Shared Memory
+Process 1: Writer (Checks if a User-Provided Number is Prime)
+c
+Copy code
+// prime_writer.c
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/ipc.h>
+#include <sys/shm.h>
+
+#define SHM_SIZE 1024  // Size of shared memory
+
+// Function to check if a number is prime
+int isPrime(int n) {
+    if (n <= 1) return 0;
+    for (int i = 2; i * i <= n; i++) {
+        if (n % i == 0) return 0;
+    }
+    return 1;
+}
+
+int main() {
+    key_t key = ftok("shmfile", 65);  // Generate unique key
+    int shmid = shmget(key, SHM_SIZE, 0666 | IPC_CREAT);  // Create shared memory
+
+    if (shmid < 0) {
+        perror("shmget failed");
+        exit(1);
+    }
+
+    int *data = (int *)shmat(shmid, NULL, 0);  // Attach shared memory to process
+    if (data == (int *)-1) {
+        perror("shmat failed");
+        exit(1);
+    }
+
+    int num;
+    printf("Enter a number to check if it is prime: ");
+    scanf("%d", &num);  // User input
+
+    data[0] = num;                 // Store the number in shared memory
+    data[1] = isPrime(num);         // Store the result (1 if prime, 0 otherwise)
+
+    printf("Result stored in shared memory.\n");
+
+    shmdt(data);  // Detach from shared memory
+    return 0;
+}
+Process 2: Reader (Reads the Result from Shared Memory)
+c
+Copy code
+// prime_reader.c
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/ipc.h>
+#include <sys/shm.h>
+
+#define SHM_SIZE 1024  // Size of shared memory
+
+int main() {
+    key_t key = ftok("shmfile", 65);  // Generate the same unique key
+    int shmid = shmget(key, SHM_SIZE, 0666);  // Access the shared memory
+
+    if (shmid < 0) {
+        perror("shmget failed");
+        exit(1);
+    }
+
+    int *data = (int *)shmat(shmid, NULL, 0);  // Attach shared memory to process
+    if (data == (int *)-1) {
+        perror("shmat failed");
+        exit(1);
+    }
+
+    int num = data[0];  // Read the number from shared memory
+    int is_prime = data[1];  // Read the result from shared memory
+
+    if (is_prime) {
+        printf("The number %d is prime.\n", num);
+    } else {
+        printf("The number %d is not prime.\n", num);
+    }
+
+    shmdt(data);  // Detach from shared memory
+    shmctl(shmid, IPC_RMID, NULL);  // Destroy shared memory
+
+    return 0;
+}
+
+Code: Fibonacci Series Using Shared Memory
+Process 1: Writer (Generates Fibonacci Series)
+c
+Copy code
+// fibonacci_writer.c
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/ipc.h>
+#include <sys/shm.h>
+
+#define SHM_SIZE 1024  // Size of shared memory
+
+int main() {
+    key_t key = ftok("shmfile", 65);  // Generate a unique key
+    int shmid = shmget(key, SHM_SIZE, 0666 | IPC_CREAT);  // Create shared memory
+
+    if (shmid < 0) {
+        perror("shmget failed");
+        exit(1);
+    }
+
+    int *data = (int *)shmat(shmid, NULL, 0);  // Attach shared memory to process
+    if (data == (int *)-1) {
+        perror("shmat failed");
+        exit(1);
+    }
+
+    int n;
+    printf("Enter the number of terms for Fibonacci series: ");
+    scanf("%d", &n);  // User input
+
+    if (n < 1) {
+        printf("Invalid input! Please enter a positive number.\n");
+        shmdt(data);  // Detach from shared memory
+        exit(1);
+    }
+
+    // Generate Fibonacci series
+    data[0] = 0;
+    if (n > 1) data[1] = 1;
+
+    for (int i = 2; i < n; i++) {
+        data[i] = data[i - 1] + data[i - 2];  // Store Fibonacci term in shared memory
+    }
+    data[n] = -1;  // End of series marker
+
+    printf("Fibonacci series stored in shared memory.\n");
+
+    shmdt(data);  // Detach from shared memory
+    return 0;
+}
+Process 2: Reader (Reads Fibonacci Series from Shared Memory)
+c
+Copy code
+// fibonacci_reader.c
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/ipc.h>
+#include <sys/shm.h>
+
+#define SHM_SIZE 1024  // Size of shared memory
+
+int main() {
+    key_t key = ftok("shmfile", 65);  // Generate the same unique key
+    int shmid = shmget(key, SHM_SIZE, 0666);  // Access the shared memory
+
+    if (shmid < 0) {
+        perror("shmget failed");
+        exit(1);
+    }
+
+    int *data = (int *)shmat(shmid, NULL, 0);  // Attach shared memory to process
+    if (data == (int *)-1) {
+        perror("shmat failed");
+        exit(1);
+    }
+
+    printf("Reading Fibonacci series from shared memory:\n");
+    for (int i = 0; data[i] != -1; i++) {  // Read until -1 marker
+        printf("%d ", data[i]);
+    }
+    printf("\n");
+
+    shmdt(data);  // Detach from shared memory
+    shmctl(shmid, IPC_RMID, NULL);  // Destroy shared memory
+
+    return 0;
+}
+
+1. Reverse a String Using Shared Memory
+Writer Process (Stores User-Input String)
+c
+Copy code
+// reverse_writer.c
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/ipc.h>
+#include <sys/shm.h>
+#include <string.h>
+
+#define SHM_SIZE 1024
+
+int main() {
+    key_t key = ftok("shmfile", 65);
+    int shmid = shmget(key, SHM_SIZE, 0666 | IPC_CREAT);
+
+    char *data = (char *)shmat(shmid, NULL, 0);
+
+    printf("Enter a string: ");
+    fgets(data, SHM_SIZE, stdin);
+
+    data[strcspn(data, "\n")] = 0;  // Remove trailing newline
+
+    shmdt(data);
+    return 0;
+}
+Reader Process (Reads and Reverses the String)
+c
+Copy code
+// reverse_reader.c
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/ipc.h>
+#include <sys/shm.h>
+#include <string.h>
+
+#define SHM_SIZE 1024
+
+int main() {
+    key_t key = ftok("shmfile", 65);
+    int shmid = shmget(key, SHM_SIZE, 0666);
+
+    char *data = (char *)shmat(shmid, NULL, 0);
+
+    int len = strlen(data);
+    printf("Reversed string: ");
+    for (int i = len - 1; i >= 0; i--) {
+        putchar(data[i]);
+    }
+    printf("\n");
+
+    shmdt(data);
+    shmctl(shmid, IPC_RMID, NULL);
+    return 0;
+}
+2. Sum of an Array Using Shared Memory
+Writer Process (Stores Array)
+c
+Copy code
+// sum_writer.c
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/ipc.h>
+#include <sys/shm.h>
+
+#define SHM_SIZE 1024
+
+int main() {
+    key_t key = ftok("shmfile", 65);
+    int shmid = shmget(key, SHM_SIZE, 0666 | IPC_CREAT);
+
+    int *data = (int *)shmat(shmid, NULL, 0);
+
+    int n;
+    printf("Enter size of array: ");
+    scanf("%d", &n);
+    data[0] = n;
+
+    printf("Enter %d elements: ", n);
+    for (int i = 1; i <= n; i++) {
+        scanf("%d", &data[i]);
+    }
+
+    shmdt(data);
+    return 0;
+}
+Reader Process (Calculates Sum)
+c
+Copy code
+// sum_reader.c
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/ipc.h>
+#include <sys/shm.h>
+
+#define SHM_SIZE 1024
+
+int main() {
+    key_t key = ftok("shmfile", 65);
+    int shmid = shmget(key, SHM_SIZE, 0666);
+
+    int *data = (int *)shmat(shmid, NULL, 0);
+    int n = data[0];
+
+    int sum = 0;
+    for (int i = 1; i <= n; i++) {
+        sum += data[i];
+    }
+    printf("Sum of the array: %d\n", sum);
+
+    shmdt(data);
+    shmctl(shmid, IPC_RMID, NULL);
+    return 0;
+}
+4. Factorial of a Number Using Shared Memory
+Writer Process (Stores Number)
+c
+Copy code
+// factorial_writer.c
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/ipc.h>
+#include <sys/shm.h>
+
+#define SHM_SIZE 1024
+
+int main() {
+    key_t key = ftok("shmfile", 65);
+    int shmid = shmget(key, SHM_SIZE, 0666 | IPC_CREAT);
+
+    int *data = (int *)shmat(shmid, NULL, 0);
+
+    printf("Enter a number: ");
+    scanf("%d", &data[0]);
+
+    shmdt(data);
+    return 0;
+}
+Reader Process (Calculates Factorial)
+c
+Copy code
+// factorial_reader.c
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/ipc.h>
+#include <sys/shm.h>
+
+#define SHM_SIZE 1024
+
+int main() {
+    key_t key = ftok("shmfile", 65);
+    int shmid = shmget(key, SHM_SIZE, 0666);
+
+    int *data = (int *)shmat(shmid, NULL, 0);
+    int n = data[0];
+    long long fact = 1;
+
+    for (int i = 1; i <= n; i++) {
+        fact *= i;
+    }
+    printf("Factorial of %d: %lld\n", n, fact);
+
+    shmdt(data);
+    shmctl(shmid, IPC_RMID, NULL);
+    return 0;
+}
+5. Matrix Addition Using Shared Memory
+Writer Process (Stores Two Matrices)
+c
+Copy code
+// matrix_writer.c
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/ipc.h>
+#include <sys/shm.h>
+
+#define SHM_SIZE 1024
+
+int main() {
+    key_t key = ftok("shmfile", 65);
+    int shmid = shmget(key, SHM_SIZE, 0666 | IPC_CREAT);
+
+    int (*mat)[3] = shmat(shmid, NULL, 0);
+
+    printf("Enter first 3x3 matrix:\n");
+    for (int i = 0; i < 3; i++) {
+        for (int j = 0; j < 3; j++) {
+            scanf("%d", &mat[i][j]);
+        }
+    }
+
+    printf("Enter second 3x3 matrix:\n");
+    for (int i = 3; i < 6; i++) {
+        for (int j = 0; j < 3; j++) {
+            scanf("%d", &mat[i][j]);
+        }
+    }
+
+    shmdt(mat);
+    return 0;
+}
+Reader Process (Calculates Matrix Addition)
+c
+Copy code
+// matrix_reader.c
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/ipc.h>
+#include <sys/shm.h>
+
+#define SHM_SIZE 1024
+
+int main() {
+    key_t key = ftok("shmfile", 65);
+    int shmid = shmget(key, SHM_SIZE, 0666);
+
+    int (*mat)[3] = shmat(shmid, NULL, 0);
+
+    printf("Result of matrix addition:\n");
+    for (int i = 0; i < 3; i++) {
+        for (int j = 0; j < 3; j++) {
+            printf("%d ", mat[i][j] + mat[i + 3][j]);
+        }
+        printf("\n");
+    }
+
+    shmdt(mat);
+    shmctl(shmid, IPC_RMID, NULL);
+    return 0;
+}
+8. Sorting an Array Using Shared Memory
+Writer Process (Stores Array)
+c
+Copy code
+// sort_writer.c
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/ipc.h>
+#include <sys/shm.h>
+
+#define SHM_SIZE 1024
+
+int main() {
+    key_t key = ftok("shmfile", 65);
+    int shmid = shmget(key, SHM_SIZE, 0666 | IPC_CREAT);
+
+    int *data = (int *)shmat(shmid, NULL, 0);
+
+    int n;
+    printf("Enter size of array: ");
+    scanf("%d", &n);
+    data[0] = n;
+
+    printf("Enter %d elements: ", n);
+    for (int i = 1; i <= n; i++) {
+        scanf("%d", &data[i]);
+    }
+
+    shmdt(data);
+    return 0;
+}
+Reader Process (Sorts the Array)
+c
+Copy code
+// sort_reader.c
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/ipc.h>
+#include <sys/shm.h>
+
+#define SHM_SIZE 1024
+
+void bubbleSort(int arr[], int n) {
+    for (int i = 1; i < n; i++) {
+        for (int j = 1; j <= n - i; j++) {
+            if (arr[j] > arr[j + 1]) {
+                int temp = arr[j];
+                arr[j] = arr[j + 1];
+                arr[j + 1] = temp;
+            }
+        }
+    }
+}
+
+int main() {
+    key_t key = ftok("shmfile", 65);
+    int shmid = shmget(key, SHM_SIZE, 0666);
+
+    int *data = (int *)shmat(shmid, NULL, 0);
+    int n = data[0];
+
+    bubbleSort(data, n);
+
+    printf("Sorted array: ");
+    for (int i = 1; i <= n; i++) {
+        printf("%d ", data[i]);
+    }
+    printf("\n");
+
+    shmdt(data);
+    shmctl(shmid, IPC_RMID, NULL);
+    return 0;
+}
+
+11. Calculator Using Shared Memory
+Writer Process (Takes User Input for Calculation)
+c
+Copy code
+// calculator_writer.c
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/ipc.h>
+#include <sys/shm.h>
+
+#define SHM_SIZE 1024
+
+int main() {
+    key_t key = ftok("shmfile", 65);
+    int shmid = shmget(key, SHM_SIZE, 0666 | IPC_CREAT);
+
+    char *data = (char *)shmat(shmid, NULL, 0);
+
+    double num1, num2;
+    char operator;
+
+    printf("Enter an expression (e.g., 5 + 3): ");
+    scanf("%lf %c %lf", &num1, &operator, &num2);
+
+    sprintf(data, "%lf %c %lf", num1, operator, num2);
+
+    shmdt(data);
+    return 0;
+}
+Reader Process (Performs the Calculation)
+c
+Copy code
+// calculator_reader.c
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/ipc.h>
+#include <sys/shm.h>
+
+#define SHM_SIZE 1024
+
+int main() {
+    key_t key = ftok("shmfile", 65);
+    int shmid = shmget(key, SHM_SIZE, 0666);
+
+    char *data = (char *)shmat(shmid, NULL, 0);
+
+    double num1, num2, result;
+    char operator;
+    sscanf(data, "%lf %c %lf", &num1, &operator, &num2);
+
+    switch (operator) {
+        case '+': result = num1 + num2; break;
+        case '-': result = num1 - num2; break;
+        case '*': result = num1 * num2; break;
+        case '/': result = num2 != 0 ? num1 / num2 : 0; break;
+        default: printf("Invalid operator\n"); return 1;
+    }
+
+    printf("Result: %lf\n", result);
+
+    shmdt(data);
+    shmctl(shmid, IPC_RMID, NULL);
+    return 0;
+}
+13. Character Frequency Counter Using Shared Memory
+Writer Process (Stores the String)
+c
+Copy code
+// char_freq_writer.c
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/ipc.h>
+#include <sys/shm.h>
+
+#define SHM_SIZE 1024
+
+int main() {
+    key_t key = ftok("shmfile", 65);
+    int shmid = shmget(key, SHM_SIZE, 0666 | IPC_CREAT);
+
+    char *data = (char *)shmat(shmid, NULL, 0);
+
+    printf("Enter a string: ");
+    fgets(data, SHM_SIZE, stdin);
+
+    shmdt(data);
+    return 0;
+}
+Reader Process (Calculates Character Frequency)
+c
+Copy code
+// char_freq_reader.c
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/ipc.h>
+#include <sys/shm.h>
+
+#define SHM_SIZE 1024
+
+int main() {
+    key_t key = ftok("shmfile", 65);
+    int shmid = shmget(key, SHM_SIZE, 0666);
+
+    char *data = (char *)shmat(shmid, NULL, 0);
+    int freq[256] = {0};
+
+    for (int i = 0; i < strlen(data); i++) {
+        freq[(int)data[i]]++;
+    }
+
+    printf("Character frequency:\n");
+    for (int i = 0; i < 256; i++) {
+        if (freq[i] > 0) {
+            printf("%c: %d\n", i, freq[i]);
+        }
+    }
+
+    shmdt(data);
+    shmctl(shmid, IPC_RMID, NULL);
+    return 0;
+}
+15. Word Count Using Shared Memory
+Writer Process (Stores the Paragraph)
+c
+Copy code
+// word_count_writer.c
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/ipc.h>
+#include <sys/shm.h>
+
+#define SHM_SIZE 1024
+
+int main() {
+    key_t key = ftok("shmfile", 65);
+    int shmid = shmget(key, SHM_SIZE, 0666 | IPC_CREAT);
+
+    char *data = (char *)shmat(shmid, NULL, 0);
+
+    printf("Enter a paragraph: ");
+    fgets(data, SHM_SIZE, stdin);
+
+    shmdt(data);
+    return 0;
+}
+Reader Process (Counts Words)
+c
+Copy code
+// word_count_reader.c
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/ipc.h>
+#include <sys/shm.h>
+
+#define SHM_SIZE 1024
+
+int main() {
+    key_t key = ftok("shmfile", 65);
+    int shmid = shmget(key, SHM_SIZE, 0666);
+
+    char *data = (char *)shmat(shmid, NULL, 0);
+
+    int word_count = 0;
+    char *token = strtok(data, " \t\n");
+
+    while (token != NULL) {
+        word_count++;
+        token = strtok(NULL, " \t\n");
+    }
+
+    printf("Word count: %d\n", word_count);
+
+    shmdt(data);
+    shmctl(shmid, IPC_RMID, NULL);
+    return 0;
+}
+Matrix Multiplication Using Shared Memory
+Writer Process (Stores Two Matrices)
+c
+Copy code
+// matrix_mul_writer.c
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/ipc.h>
+#include <sys/shm.h>
+
+#define SHM_SIZE 1024
+
+int main() {
+    key_t key = ftok("shmfile", 65);
+    int shmid = shmget(key, SHM_SIZE, 0666 | IPC_CREAT);
+
+    int (*mat)[3] = shmat(shmid, NULL, 0);
+
+    printf("Enter first 3x3 matrix:\n");
+    for (int i = 0; i < 3; i++) {
+        for (int j = 0; j < 3; j++) {
+            scanf("%d", &mat[i][j]);
+        }
+    }
+
+    printf("Enter second 3x3 matrix:\n");
+    for (int i = 3; i < 6; i++) {
+        for (int j = 0; j < 3; j++) {
+            scanf("%d", &mat[i][j]);
+        }
+    }
+
+    shmdt(mat);
+    return 0;
+}
+// matrix_mul_reader.c
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/ipc.h>
+#include <sys/shm.h>
+
+#define SHM_SIZE 1024
+
+int main() {
+    key_t key = ftok("shmfile", 65);  // Generate the same unique key
+    int shmid = shmget(key, SHM_SIZE, 0666);  // Access shared memory
+
+    if (shmid < 0) {
+        perror("shmget failed");
+        exit(1);
+    }
+
+    int (*mat)[3] = shmat(shmid, NULL, 0);  // Attach shared memory
+    if (mat == (int *)-1) {
+        perror("shmat failed");
+        exit(1);
+    }
+
+    int result[3][3] = {0};  // Initialize result matrix to zero
+
+    // Perform matrix multiplication
+    for (int i = 0; i < 3; i++) {
+        for (int j = 0; j < 3; j++) {
+            for (int k = 0; k < 3; k++) {
+                result[i][j] += mat[i][k] * mat[k + 3][j];
+            }
+        }
+    }
+
+    // Print the result of matrix multiplication
+    printf("Result of matrix multiplication:\n");
+    for (int i = 0; i < 3; i++) {
+        for (int j = 0; j < 3; j++) {
+            printf("%d ", result[i][j]);
+        }
+        printf("\n");
+    }
+
+    shmdt(mat);  // Detach from shared memory
+    shmctl(shmid, IPC_RMID, NULL);  // Destroy shared memory
+
+    return 0;
+}
